@@ -33,7 +33,7 @@ const aiSummarySchema = new mongoose.Schema({
 });
 
 // Index for note lookups
-aiSummarySchema.index({ note: 1 });
+
 
 // Virtual for note details (if needed)
 aiSummarySchema.virtual('noteDetails', {
