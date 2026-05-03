@@ -13,13 +13,13 @@ const connectDB = require('./config/db');
 const logger = require('./middleware/logger');
 const errorHandler = require('./middleware/errorHandler');
 
-const authRoutes      = require('./routes/authRoutes');
-const notesRoutes     = require('./routes/notesRoutes');
-const adminRoutes     = require('./routes/adminRoutes');
-const aiRoutes        = require('./routes/aiRoutes');
-const chatRoutes      = require('./routes/chatRoutes');
-const commentRoutes   = require('./routes/commentRoutes');
-const messageRoutes   = require('./routes/messageRoutes');
+const authRoutes = require('./routes/authRoutes');
+const notesRoutes = require('./routes/notesRoutes');
+const adminRoutes = require('./routes/adminRoutes');
+const aiRoutes = require('./routes/aiRoutes');
+const chatRoutes = require('./routes/chatRoutes');
+const commentRoutes = require('./routes/commentRoutes');
+const messageRoutes = require('./routes/messageRoutes');
 const dashboardRoutes = require('./routes/dashboardRoutes');
 
 connectDB();
@@ -27,29 +27,32 @@ connectDB();
 const app = express();
 const server = http.createServer(app);
 
-// ✅ Allowed origins list
+// ==================== CORS CONFIG (Most Important) ====================
 const allowedOrigins = [
   'http://localhost:5173',
   'http://localhost:3000',
-  'https://learn-hub-frontend-lilac.vercel.app', // ✅ hardcoded as backup
-  process.env.FRONTEND_URL,
-].filter(Boolean);
+  'https://learn-hub-frontend-lilac.vercel.app',   // ← Your Vercel frontend
+];
 
-console.log('Allowed origins:', allowedOrigins); // debug log
+// Add FRONTEND_URL from environment variable (if set in Render)
+if (process.env.FRONTEND_URL) {
+  allowedOrigins.push(process.env.FRONTEND_URL);
+}
 
-// ✅ This must be the FIRST middleware — before everything else
+console.log('Allowed Origins:', allowedOrigins);
+
+// Custom CORS middleware - Must be FIRST
 app.use((req, res, next) => {
   const origin = req.headers.origin;
 
-  // Always set these headers for every request
   if (origin && allowedOrigins.includes(origin)) {
     res.header('Access-Control-Allow-Origin', origin);
   }
+
   res.header('Access-Control-Allow-Credentials', 'true');
   res.header('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS, PATCH');
   res.header('Access-Control-Allow-Headers', 'Origin, X-Requested-With, Content-Type, Accept, x-auth-token, Authorization');
 
-  // Respond to preflight immediately
   if (req.method === 'OPTIONS') {
     return res.sendStatus(200);
   }
@@ -57,40 +60,40 @@ app.use((req, res, next) => {
   next();
 });
 
-// ✅ cors package as second layer
+// Fallback cors
 app.use(cors({
   origin: allowedOrigins,
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS', 'PATCH'],
-  allowedHeaders: ['Origin', 'X-Requested-With', 'Content-Type', 'Accept', 'x-auth-token', 'Authorization'],
-  optionsSuccessStatus: 200,
+  allowedHeaders: ['Origin', 'X-Requested-With', 'Content-Type', 'Accept', 'x-auth-token', 'Authorization']
 }));
 
+// Other middleware
 app.use(logger);
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 
-// ✅ Socket.io
+// Socket.io
 const io = socketIo(server, {
   cors: {
     origin: allowedOrigins,
     methods: ['GET', 'POST'],
-    credentials: true,
+    credentials: true
   }
 });
 
 io.use((socket, next) => {
   const token = socket.handshake.auth?.token;
-  if (!token) return next(new Error('Authentication error: No token'));
+  if (!token) return next(new Error('No token'));
   jwt.verify(token, process.env.JWT_SECRET, (err, decoded) => {
-    if (err) return next(new Error('Authentication error: Invalid token'));
+    if (err) return next(new Error('Invalid token'));
     socket.userId = decoded.user.id;
     next();
   });
 });
 
 io.on('connection', (socket) => {
-  console.log(`✅ User connected: ${socket.id} | UserID: ${socket.userId}`);
+  console.log(`User connected: ${socket.id} | UserID: ${socket.userId}`);
 
   socket.on('joinRoom', (roomId) => {
     socket.join(roomId);
@@ -106,8 +109,8 @@ io.on('connection', (socket) => {
         text: data.text.trim()
       });
       await message.save();
-      const populatedMessage = await message.populate('sender', 'name profilePic');
-      io.to(data.roomId).emit('newMessage', populatedMessage);
+      const populated = await message.populate('sender', 'name profilePic');
+      io.to(data.roomId).emit('newMessage', populated);
     } catch (err) {
       console.error('Message save error:', err);
       socket.emit('error', { msg: 'Failed to send message' });
@@ -120,27 +123,20 @@ io.on('connection', (socket) => {
 });
 
 // Routes
-app.use('/api/auth',      authRoutes);
-app.use('/api/notes',     notesRoutes);
-app.use('/api/admin',     adminRoutes);
-app.use('/api/ai',        aiRoutes);
-app.use('/api/chat',      chatRoutes);
+app.use('/api/auth', authRoutes);
+app.use('/api/notes', notesRoutes);
+app.use('/api/admin', adminRoutes);
+app.use('/api/ai', aiRoutes);
+app.use('/api/chat', chatRoutes);
 app.use('/api/dashboard', dashboardRoutes);
-app.use('/api/comments',  commentRoutes);
-app.use('/api/messages',  messageRoutes);
+app.use('/api/comments', commentRoutes);
+app.use('/api/messages', messageRoutes);
 
-// Health check
 app.get('/', (req, res) => {
-  res.json({
-    message: 'Student Knowledge Exchange Backend is running!',
-    version: '1.0.0',
-    timestamp: new Date().toISOString()
-  });
+  res.json({ message: 'Backend is running!', version: '1.0.0' });
 });
 
-app.use((req, res) => {
-  res.status(404).json({ msg: 'Route not found' });
-});
+app.use((req, res) => res.status(404).json({ msg: 'Route not found' }));
 
 app.use(errorHandler);
 
@@ -149,7 +145,7 @@ server.listen(PORT, () => {
   console.log(`Server running on port ${PORT}`);
 });
 
-process.on('SIGTERM', async () => {
+process.on('SIGTERM', () => {
   console.log('SIGTERM received, shutting down gracefully');
   server.close(() => process.exit(0));
 });
