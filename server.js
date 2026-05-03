@@ -98,7 +98,6 @@ io.on('connection', (socket) => {
     console.log(`User disconnected: ${socket.id}`);
   });
 });
-
 // Routes
 app.use('/api/auth',      authRoutes);
 app.use('/api/notes',     notesRoutes);
