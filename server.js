@@ -28,27 +28,28 @@ const app = express();
 const server = http.createServer(app);
 
 // ==================== PRODUCTION CORS SETUP ====================
+// server.js
+// server.js - CORS Section (Replace your current CORS code)
 const allowedOrigins = [
   'http://localhost:5173',
   'http://localhost:3000',
-  'https://learn-hub-frontend-lilac.vercel.app',
-  process.env.FRONTEND_URL
+  process.env.FRONTEND_URL   // ← Most important
 ].filter(Boolean);
 
 console.log('✅ Allowed Origins:', allowedOrigins);
 
-// Main CORS Middleware - Must be at the very top
 app.use(cors({
   origin: function (origin, callback) {
     if (!origin || allowedOrigins.includes(origin)) {
       callback(null, true);
     } else {
+      console.log('❌ Blocked Origin:', origin);
       callback(new Error('Not allowed by CORS'));
     }
   },
   credentials: true,
-  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS', 'PATCH'],
-  allowedHeaders: ['Content-Type', 'x-auth-token', 'Authorization', 'Accept'],
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'x-auth-token', 'Authorization'],
   optionsSuccessStatus: 200
 }));
 
