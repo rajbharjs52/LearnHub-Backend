@@ -27,45 +27,50 @@ connectDB();
 const app = express();
 const server = http.createServer(app);
 
-// ✅ CORS — reads allowed origins from env
+// ✅ Allowed origins list
 const allowedOrigins = [
   'http://localhost:5173',
   'http://localhost:3000',
+  'https://learn-hub-frontend-lilac.vercel.app', // ✅ hardcoded as backup
   process.env.FRONTEND_URL,
 ].filter(Boolean);
 
-// ✅ Manual CORS headers — works with Express 5
+console.log('Allowed origins:', allowedOrigins); // debug log
+
+// ✅ This must be the FIRST middleware — before everything else
 app.use((req, res, next) => {
   const origin = req.headers.origin;
-  if (allowedOrigins.includes(origin)) {
-    res.setHeader('Access-Control-Allow-Origin', origin);
+
+  // Always set these headers for every request
+  if (origin && allowedOrigins.includes(origin)) {
+    res.header('Access-Control-Allow-Origin', origin);
   }
-  res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
-  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, x-auth-token, Authorization');
-  res.setHeader('Access-Control-Allow-Credentials', 'true');
+  res.header('Access-Control-Allow-Credentials', 'true');
+  res.header('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS, PATCH');
+  res.header('Access-Control-Allow-Headers', 'Origin, X-Requested-With, Content-Type, Accept, x-auth-token, Authorization');
+
+  // Respond to preflight immediately
   if (req.method === 'OPTIONS') {
-    return res.status(200).end();
+    return res.sendStatus(200);
   }
+
   next();
 });
 
-// ✅ Keep this too — works together with the manual headers
+// ✅ cors package as second layer
 app.use(cors({
-  origin: (origin, callback) => {
-    if (!origin) return callback(null, true);
-    if (allowedOrigins.includes(origin)) return callback(null, true);
-    callback(new Error(`CORS blocked: ${origin}`));
-  },
+  origin: allowedOrigins,
   credentials: true,
-  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
-  allowedHeaders: ['Content-Type', 'x-auth-token', 'Authorization'],
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS', 'PATCH'],
+  allowedHeaders: ['Origin', 'X-Requested-With', 'Content-Type', 'Accept', 'x-auth-token', 'Authorization'],
+  optionsSuccessStatus: 200,
 }));
 
 app.use(logger);
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 
-// ✅ Socket.io — also reads from env
+// ✅ Socket.io
 const io = socketIo(server, {
   cors: {
     origin: allowedOrigins,
@@ -113,6 +118,7 @@ io.on('connection', (socket) => {
     console.log(`User disconnected: ${socket.id}`);
   });
 });
+
 // Routes
 app.use('/api/auth',      authRoutes);
 app.use('/api/notes',     notesRoutes);
@@ -123,7 +129,7 @@ app.use('/api/dashboard', dashboardRoutes);
 app.use('/api/comments',  commentRoutes);
 app.use('/api/messages',  messageRoutes);
 
-// Health check — Render pings this to keep server alive
+// Health check
 app.get('/', (req, res) => {
   res.json({
     message: 'Student Knowledge Exchange Backend is running!',
