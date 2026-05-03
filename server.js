@@ -27,45 +27,29 @@ connectDB();
 const app = express();
 const server = http.createServer(app);
 
-// ==================== CORS CONFIG (Most Important) ====================
+// ==================== PRODUCTION CORS SETUP ====================
 const allowedOrigins = [
   'http://localhost:5173',
   'http://localhost:3000',
-  'https://learn-hub-frontend-lilac.vercel.app',   // ← Your Vercel frontend
-];
+  'https://learn-hub-frontend-lilac.vercel.app',
+  process.env.FRONTEND_URL
+].filter(Boolean);
 
-// Add FRONTEND_URL from environment variable (if set in Render)
-if (process.env.FRONTEND_URL) {
-  allowedOrigins.push(process.env.FRONTEND_URL);
-}
+console.log('✅ Allowed Origins:', allowedOrigins);
 
-console.log('Allowed Origins:', allowedOrigins);
-
-// Custom CORS middleware - Must be FIRST
-app.use((req, res, next) => {
-  const origin = req.headers.origin;
-
-  if (origin && allowedOrigins.includes(origin)) {
-    res.header('Access-Control-Allow-Origin', origin);
-  }
-
-  res.header('Access-Control-Allow-Credentials', 'true');
-  res.header('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS, PATCH');
-  res.header('Access-Control-Allow-Headers', 'Origin, X-Requested-With, Content-Type, Accept, x-auth-token, Authorization');
-
-  if (req.method === 'OPTIONS') {
-    return res.sendStatus(200);
-  }
-
-  next();
-});
-
-// Fallback cors
+// Main CORS Middleware - Must be at the very top
 app.use(cors({
-  origin: allowedOrigins,
+  origin: function (origin, callback) {
+    if (!origin || allowedOrigins.includes(origin)) {
+      callback(null, true);
+    } else {
+      callback(new Error('Not allowed by CORS'));
+    }
+  },
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS', 'PATCH'],
-  allowedHeaders: ['Origin', 'X-Requested-With', 'Content-Type', 'Accept', 'x-auth-token', 'Authorization']
+  allowedHeaders: ['Content-Type', 'x-auth-token', 'Authorization', 'Accept'],
+  optionsSuccessStatus: 200
 }));
 
 // Other middleware
@@ -82,6 +66,7 @@ const io = socketIo(server, {
   }
 });
 
+// Socket Auth + Logic (unchanged)
 io.use((socket, next) => {
   const token = socket.handshake.auth?.token;
   if (!token) return next(new Error('No token'));
@@ -95,10 +80,7 @@ io.use((socket, next) => {
 io.on('connection', (socket) => {
   console.log(`User connected: ${socket.id} | UserID: ${socket.userId}`);
 
-  socket.on('joinRoom', (roomId) => {
-    socket.join(roomId);
-    console.log(`User ${socket.userId} joined room ${roomId}`);
-  });
+  socket.on('joinRoom', (roomId) => socket.join(roomId));
 
   socket.on('sendMessage', async (data) => {
     try {
@@ -117,9 +99,7 @@ io.on('connection', (socket) => {
     }
   });
 
-  socket.on('disconnect', () => {
-    console.log(`User disconnected: ${socket.id}`);
-  });
+  socket.on('disconnect', () => console.log(`User disconnected: ${socket.id}`));
 });
 
 // Routes
@@ -132,18 +112,14 @@ app.use('/api/dashboard', dashboardRoutes);
 app.use('/api/comments', commentRoutes);
 app.use('/api/messages', messageRoutes);
 
-app.get('/', (req, res) => {
-  res.json({ message: 'Backend is running!', version: '1.0.0' });
-});
+app.get('/', (req, res) => res.json({ message: 'Backend is running!' }));
 
 app.use((req, res) => res.status(404).json({ msg: 'Route not found' }));
 
 app.use(errorHandler);
 
 const PORT = process.env.PORT || 5000;
-server.listen(PORT, () => {
-  console.log(`Server running on port ${PORT}`);
-});
+server.listen(PORT, () => console.log(`Server running on port ${PORT}`));
 
 process.on('SIGTERM', () => {
   console.log('SIGTERM received, shutting down gracefully');
