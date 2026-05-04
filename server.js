@@ -33,25 +33,35 @@ const server = http.createServer(app);
 const allowedOrigins = [
   'http://localhost:5173',
   'http://localhost:3000',
-  process.env.FRONTEND_URL   // ← Most important
+  process.env.FRONTEND_URL // MUST be set correctly on Render
 ].filter(Boolean);
 
 console.log('✅ Allowed Origins:', allowedOrigins);
 
 app.use(cors({
   origin: function (origin, callback) {
-    if (!origin || allowedOrigins.includes(origin)) {
-      callback(null, true);
-    } else {
-      console.log('❌ Blocked Origin:', origin);
-      callback(new Error('Not allowed by CORS'));
+    // Allow Postman / mobile apps
+    if (!origin) {
+      return callback(null, true);
     }
+
+    // Normalize origin (remove trailing slash)
+    const normalizedOrigin = origin.replace(/\/$/, '');
+
+    if (allowedOrigins.includes(normalizedOrigin)) {
+      console.log('✅ Allowed:', normalizedOrigin);
+      return callback(null, true);
+    }
+
+    console.log('❌ Blocked Origin:', normalizedOrigin);
+    return callback(new Error('Not allowed by CORS'));
   },
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
-  allowedHeaders: ['Content-Type', 'x-auth-token', 'Authorization'],
-  optionsSuccessStatus: 200
+  allowedHeaders: ['Content-Type', 'Authorization', 'x-auth-token']
 }));
+
+app.options('*', cors());
 
 // Other middleware
 app.use(logger);
