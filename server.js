@@ -61,7 +61,6 @@ app.use(cors({
   allowedHeaders: ['Content-Type', 'Authorization', 'x-auth-token']
 }));
 
-app.options('*', cors());
 
 // Other middleware
 app.use(logger);
